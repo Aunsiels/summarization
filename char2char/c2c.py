@@ -1,6 +1,5 @@
 """ Char2Char implementation """
 import math
-import random
 import numpy as np
 import tensorflow as tf
 from tensorflow.python.ops import rnn, rnn_cell, seq2seq
@@ -11,13 +10,14 @@ VOCABULARY_SIZE = 256
 EMBEDDING_SIZE_INPUT = 128
 EMBEDDING_SIZE_OUTPUT = 512  #512 #128 #512
 BATCH_SIZE = 64 #5 # 64
-MAX_LENGTH = 400 #200 # 640 #2048 # MULTIPLE OF STRIDE_POOLING !
+MAX_LENGTH_INPUT = 640 #200 # 640 #2048 # MULTIPLE OF STRIDE_POOLING !
+MAX_LENGTH_OUTPUT = 200
 FILTER_SIZES = [200, 250, 300, 300] #[20, 25, 30, 30] #
 STRIDE_POOLING = 5
 NUM_FILTERS = 2
 HIGHWAY_LAYERS = 4
 HIDDEN_SIZE_INPUT = 512 #512 #128#512
-HIDDEN_SIZE_OUTPUT = 56#1024 #128#1024
+HIDDEN_SIZE_OUTPUT = 1024#1024 #128#1024
 
 ROUGE_BASE = "/home/ubuntu/pythonrouge/pythonrouge/RELEASE-1.5.5/"
 ROUGE_SCRIPT = ROUGE_BASE + "ROUGE-1.5.5.pl"
@@ -57,16 +57,17 @@ class Char2Char(object):
     #pylint: disable=too-many-locals
     #pylint: disable=too-many-statements
     def __init__(self, vocabulary_size, embedding_size_input,
-                 max_length, filter_sizes, num_filters, stride_pooling,
+                 max_length_input, max_length_output, filter_sizes,
+                 num_filters, stride_pooling,
                  n_highway_layers, embedding_size_output, hidden_size_input,
                  hidden_size_output):
 
         # INPUT and OUTPUT
-        self.input_sentence = tf.placeholder(tf.int32, shape=[None, max_length], name="INPUT")
+        self.input_sentence = tf.placeholder(tf.int32, shape=[None, max_length_input], name="INPUT")
         self.output_sentence = tf.placeholder(tf.int32,
-                                              shape=[None, max_length], name="OUTPUT")
+                                              shape=[None, max_length_output], name="OUTPUT")
 
-        n_gru_encoder = int(math.ceil(max_length / stride_pooling))
+        n_gru_encoder = int(math.ceil(max_length_input / stride_pooling))
 
         # Embeddings
         with tf.name_scope("embedding-input"):
@@ -170,14 +171,14 @@ class Char2Char(object):
                 name="embedding-weigths-input")
             zeros = tf.zeros([batch_size, 1], dtype=tf.int32)
             output_prepend = tf.concat(1, [zeros, self.output_sentence])
-            output_slice = tf.slice(output_prepend, [0, 0], [batch_size, max_length])
+            output_slice = tf.slice(output_prepend, [0, 0], [batch_size, max_length_output])
             self.embed_output = tf.nn.embedding_lookup(embeddings,
                                                        output_slice,
                                                        name="embeddings-input")
 
         self.embed_trans = tf.transpose(self.embed_output, [1, 0, 2])
         self.embed_reshape = tf.reshape(self.embed_trans, [-1, embedding_size_output])
-        self.embed_split = tf.split(0, max_length, self.embed_reshape)
+        self.embed_split = tf.split(0, max_length_output, self.embed_reshape)
 
         print("****EMBED*****", self.embed_split[0].get_shape())
         print("LENGTH", len(self.embed_split))
@@ -211,7 +212,7 @@ class Char2Char(object):
         for output in self.output_decoder:
             self.decoder_lin.append(tf.batch_matmul(output, w_end))
 
-        output_split = tf.split(1, max_length, self.output_sentence)
+        output_split = tf.split(1, max_length_output, self.output_sentence)
 
         print("*OUTPUTDES**", self.decoder_lin[0].get_shape())
         print("LENGTH", len(self.decoder_lin))
@@ -223,7 +224,7 @@ class Char2Char(object):
 
         with tf.name_scope("loss"):
             weights = []
-            for i in range(max_length):
+            for i in range(max_length_output):
                 weights.append(tf.ones([batch_size],
                                        name="weight-%d"%i))
 
@@ -236,7 +237,7 @@ class Char2Char(object):
                                                 beta2=0.999,
                                                 epsilon=1e-08,
                                                 use_locking=False,
-                                                name='Adam').minimize(self.loss, aggregation_method=tf.AggregationMethod.EXPERIMENTAL_ACCUMULATE_N)
+                                                name='Adam').minimize(self.loss)
 
         self.sess = tf.Session()
         init_op = tf.initialize_all_variables()
@@ -264,26 +265,8 @@ class Char2Char(object):
         self.saver.restore(self.sess, filename)
         print("Model loaded")
 
-    def generate_example(self, batch_size, max_length, vocabulary_size):
-        """generate_example
-            Generate example to train the network. This is simply a sentence
-            as an input and the same reversed sentence as output
-
-        :param batch_size: The size of the batch
-        :param max_length: The length of the sentences to generate
-        :param vocabulary_size: The number of tokens in the vocabulary
-        """
-        input_x = []
-        input_y = []
-        for _ in range(batch_size):
-            temp_x = [random.randint(0, vocabulary_size - 1) for j in range(max_length)]
-            temp_y = temp_x.copy()
-            temp_y.reverse()
-            input_x.append(temp_x)
-            input_y.append(temp_y)
-        return {self.input_sentence : input_x, self.output_sentence : input_y}
-
-    def generate_batch(self, f_open_input, f_open_output, max_length, batch_size):
+    def generate_batch(self, f_open_input, f_open_output, max_length_input,
+                       max_length_output, batch_size):
         """generate_batch Get a batch of sentences
 
         :param f_open_input:
@@ -294,33 +277,16 @@ class Char2Char(object):
         res_input = []
         res_output = []
         for _ in range(batch_size):
-            temp_input = get_sentence(f_open_input, max_length)
+            temp_input = get_sentence(f_open_input, max_length_input)
             if temp_input[0] == 0:
                 return None
             res_input.append(temp_input)
-            res_output.append(get_sentence(f_open_output, max_length))
+            res_output.append(get_sentence(f_open_output, max_length_output))
         return {self.input_sentence : res_input, self.output_sentence : res_output}
 
-    def test_train(self, steps):
-        """test_train
-            Train the network on reverse tack
 
-        :param steps: Number of training steps
-        """
-        for step in range(steps):
-            feed_dict = self.generate_example(BATCH_SIZE, MAX_LENGTH,
-                                              VOCABULARY_SIZE)
-            result, _, loss_value = self.sess.run([self.output_decoder_softmax,
-                                                   self.optimizer,
-                                                   self.loss],
-                                                  feed_dict=feed_dict)
-            if step % 1 == 0:
-                print('Step %d: loss = %.2f' % (step, loss_value))
-                print(result[0].shape)
-                print(" ".join([str(x) for x in feed_dict[self.input_sentence][0]]))
-                print(" ".join([str(np.argmax(result[i][0])) for i in range(MAX_LENGTH)]))
-
-    def train_epoch(self, name_article, name_title, max_length, batch_size):
+    def train_epoch(self, name_article, name_title, max_length_input,
+                    max_length_output, batch_size):
         """train_epoch Train over a full epoch
 
         :param name_article:
@@ -330,7 +296,8 @@ class Char2Char(object):
         """
         f_input = open(name_article)
         f_output = open(name_title)
-        batch = self.generate_batch(f_input, f_output, max_length, batch_size)
+        batch = self.generate_batch(f_input, f_output, max_length_input,
+                                    max_length_output, batch_size)
         step = 0
         rouge_1 = []
         rouge_2 = []
@@ -348,7 +315,7 @@ class Char2Char(object):
                 print(result[0].shape)
                 print("".join([chr(x) for x in batch[self.input_sentence][0]]))
                 print("".join([chr(x) for x in batch[self.output_sentence][0]]))
-                print("".join([chr(np.argmax(result[i][0])) for i in range(max_length)]))
+                print("".join([chr(np.argmax(result[i][0])) for i in range(max_length_output)]))
                 rouge_1_temp = 0
                 rouge_2_temp = 0
                 rouge_3_temp = 0
@@ -357,7 +324,7 @@ class Char2Char(object):
                 loss_temp = loss_value
                 for i in range(batch_size):
                     temp = get_rouge_score("".join([chr(np.argmax(result[j][i]))
-                                                    for j in range(max_length)]),
+                                                    for j in range(max_length_output)]),
                                            "".join([chr(x)
                                                     for x in
                                                     batch[self.output_sentence][i]]))
@@ -399,7 +366,8 @@ class Char2Char(object):
                 loss_total = []
                 f_register.close()
             step += 1
-            batch = self.generate_batch(f_input, f_output, max_length, batch_size)
+            batch = self.generate_batch(f_input, f_output, max_length_input,
+                                        max_length_output, batch_size)
         self.save_model("model_test")
         f_register = open("loss.csv", "a")
         f_register.write(",".join(rouge_1))
@@ -424,7 +392,8 @@ class Char2Char(object):
         f_input.close()
         f_output.close()
 
-    def validation(self, name_article, name_title, max_length, batch_size):
+    def validation(self, name_article, name_title, max_length_input,
+                   max_length_output, batch_size):
         """validation
 
         :param name_article: The name of the file containing the text of
@@ -436,7 +405,8 @@ class Char2Char(object):
         """
         f_input = open(name_article)
         f_output = open(name_title)
-        batch = self.generate_batch(f_input, f_output, max_length, batch_size)
+        batch = self.generate_batch(f_input, f_output, max_length_input,
+                                    max_length_output, batch_size)
         count_size = 0
         sum_score = 0
         sum_loss = 0
@@ -447,17 +417,19 @@ class Char2Char(object):
             for i in range(batch_size):
                 count_size += 1
                 sum_score += get_rouge_score("".join([chr(np.argmax(result[j][i]))
-                                                      for j in range(max_length)]),
+                                                      for j in range(max_length_output)]),
                                              "".join([chr(x)
                                                       for x in
                                                       batch[self.output_sentence][i]]))['ROUGE-1']
                 sum_loss += loss_value
-            batch = self.generate_batch(f_input, f_output, max_length, batch_size)
+            batch = self.generate_batch(f_input, f_output, max_length_input,
+                                        max_length_output, batch_size)
         f_input.close()
         f_output.close()
         return sum_score / count_size, sum_loss / count_size
 
-    def evaluation(self, name_article, name_title, max_length, batch_size):
+    def evaluation(self, name_article, name_title, max_length_input,
+                   max_length_output, batch_size):
         """evaluation
 
         :param name_article: The name of the file containing the text of
@@ -469,7 +441,8 @@ class Char2Char(object):
         """
         f_input = open(name_article)
         f_output = open(name_title)
-        batch = self.generate_batch(f_input, f_output, max_length, batch_size)
+        batch = self.generate_batch(f_input, f_output, max_length_input,
+                                    max_length_output, batch_size)
         count_size = 0
         sum_loss = 0
         score_r1 = 0
@@ -486,7 +459,7 @@ class Char2Char(object):
             for i in range(batch_size):
                 count_size += 1
                 score = get_rouge_score("".join([chr(np.argmax(result[j][i]))
-                                                 for j in range(max_length)]),
+                                                 for j in range(max_length_output)]),
                                         "".join([chr(x)
                                                  for x in
                                                  batch[self.output_sentence][i]]))
@@ -496,7 +469,8 @@ class Char2Char(object):
                 score_l += score["ROUGE-L"]
                 score_su4 += score["ROUGE-SU4"]
                 sum_loss += loss_value
-            batch = self.generate_batch(f_input, f_output, max_length, batch_size)
+            batch = self.generate_batch(f_input, f_output, max_length_input,
+                                        max_length_output, batch_size)
         f_input.close()
         f_output.close()
         score_r1 /= count_size
@@ -514,7 +488,8 @@ class Char2Char(object):
         print("LOSS : %f"%sum_loss)
 
 C2C = Char2Char(VOCABULARY_SIZE, EMBEDDING_SIZE_INPUT,
-                MAX_LENGTH, FILTER_SIZES, NUM_FILTERS, STRIDE_POOLING,
+                MAX_LENGTH_INPUT, MAX_LENGTH_OUTPUT,
+                FILTER_SIZES, NUM_FILTERS, STRIDE_POOLING,
                 HIGHWAY_LAYERS, EMBEDDING_SIZE_OUTPUT, HIDDEN_SIZE_INPUT,
                 HIDDEN_SIZE_OUTPUT)
 
@@ -526,16 +501,19 @@ while NEXTR1 >= BESTR1:
     print("Begin training")
     C2C.train_epoch("/home/ubuntu/LDC/train.article.txt",
                     "/home/ubuntu/LDC/train.title.txt",
-                    MAX_LENGTH,
+                    MAX_LENGTH_INPUT,
+                    MAX_LENGTH_OUTPUT,
                     BATCH_SIZE)
     R1SCORE, LSCORE = C2C.validation("/home/ubuntu/LDC/valid.article.txt",
                                      "/home/ubuntu/LDC/valid.title.txt",
-                                     MAX_LENGTH,
+                                     MAX_LENGTH_INPUT,
+                                     MAX_LENGTH_OUTPUT,
                                      BATCH_SIZE)
     print("Validation Score : R1:%f, Loss:%f"%(R1SCORE, LSCORE))
     NEXTR1 = R1SCORE
 
 C2C.evaluation("/home/ubuntu/LDC/test.article.txt",
                "/home/ubuntu/LDC/test.title.txt",
-               MAX_LENGTH,
+               MAX_LENGTH_INPUT,
+               MAX_LENGTH_OUTPUT,
                BATCH_SIZE)
