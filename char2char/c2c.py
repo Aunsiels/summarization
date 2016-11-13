@@ -9,17 +9,17 @@ from pythonrouge import pythonrouge
 
 VOCABULARY_SIZE = 256
 EMBEDDING_SIZE_INPUT = 128
-EMBEDDING_SIZE_OUTPUT = 512 #128 #512
+EMBEDDING_SIZE_OUTPUT = 512  #512 #128 #512
 BATCH_SIZE = 64 #5 # 64
-MAX_LENGTH = 640 #200 # 640 #2048 # MULTIPLE OF STRIDE_POOLING !
+MAX_LENGTH = 400 #200 # 640 #2048 # MULTIPLE OF STRIDE_POOLING !
 FILTER_SIZES = [200, 250, 300, 300] #[20, 25, 30, 30] #
 STRIDE_POOLING = 5
 NUM_FILTERS = 2
 HIGHWAY_LAYERS = 4
-HIDDEN_SIZE_INPUT = 512 #128#512
-HIDDEN_SIZE_OUTPUT = 1024 #128#1024
+HIDDEN_SIZE_INPUT = 512 #512 #128#512
+HIDDEN_SIZE_OUTPUT = 56#1024 #128#1024
 
-ROUGE_BASE = "/home/julien/Documents/programming/python/pythonrouge/pythonrouge/RELEASE-1.5.5/"
+ROUGE_BASE = "/home/ubuntu/pythonrouge/pythonrouge/RELEASE-1.5.5/"
 ROUGE_SCRIPT = ROUGE_BASE + "ROUGE-1.5.5.pl"
 ROUGE_DATA = ROUGE_BASE + "data"
 
@@ -236,7 +236,7 @@ class Char2Char(object):
                                                 beta2=0.999,
                                                 epsilon=1e-08,
                                                 use_locking=False,
-                                                name='Adam').minimize(self.loss)
+                                                name='Adam').minimize(self.loss, aggregation_method=tf.AggregationMethod.EXPERIMENTAL_ACCUMULATE_N)
 
         self.sess = tf.Session()
         init_op = tf.initialize_all_variables()
@@ -254,6 +254,7 @@ class Char2Char(object):
         :param filename:
         """
         self.saver.save(self.sess, filename)
+        print("Model saved")
 
     def load_model(self, filename):
         """load_model Load model
@@ -261,6 +262,7 @@ class Char2Char(object):
         :param filename:
         """
         self.saver.restore(self.sess, filename)
+        print("Model loaded")
 
     def generate_example(self, batch_size, max_length, vocabulary_size):
         """generate_example
@@ -337,7 +339,7 @@ class Char2Char(object):
         rouge_l = []
         loss_total = []
         while batch is not None:
-            if step % 1000 == 0:
+            if step % 10 == 0:
                 result, _, loss_value = self.sess.run([self.output_decoder_softmax,
                                                        self.optimizer,
                                                        self.loss],
@@ -374,7 +376,7 @@ class Char2Char(object):
                 _, loss_value = self.sess.run([self.optimizer,
                                                self.loss],
                                               feed_dict=batch)
-            if step%100000 == 0:
+            if step%10000 == 0 and step > 0:
                 self.save_model("model_test")
                 f_register = open("loss.csv", "a")
                 f_register.write(",".join(rouge_1))
@@ -398,6 +400,27 @@ class Char2Char(object):
                 f_register.close()
             step += 1
             batch = self.generate_batch(f_input, f_output, max_length, batch_size)
+        self.save_model("model_test")
+        f_register = open("loss.csv", "a")
+        f_register.write(",".join(rouge_1))
+        f_register.write("\n")
+        f_register.write(",".join(rouge_2))
+        f_register.write("\n")
+        f_register.write(",".join(rouge_3))
+        f_register.write("\n")
+        f_register.write(",".join(rouge_l))
+        f_register.write("\n")
+        f_register.write(",".join(rouge_su4))
+        f_register.write("\n")
+        f_register.write(",".join(loss_total))
+        f_register.write("\n")
+        rouge_1 = []
+        rouge_2 = []
+        rouge_3 = []
+        rouge_su4 = []
+        rouge_l = []
+        loss_total = []
+        f_register.close()
         f_input.close()
         f_output.close()
 
@@ -500,18 +523,19 @@ NEXTR1 = 0.0
 
 while NEXTR1 >= BESTR1:
     BESTR1 = NEXTR1
-    C2C.train_epoch("/run/media/julien/MyPassport/LDC/train.article.txt",
-                    "/run/media/julien/MyPassport/LDC/train.title.txt",
+    print("Begin training")
+    C2C.train_epoch("/home/ubuntu/LDC/train.article.txt",
+                    "/home/ubuntu/LDC/train.title.txt",
                     MAX_LENGTH,
                     BATCH_SIZE)
-    R1SCORE, LSCORE = C2C.validation("/run/media/julien/MyPassport/LDC/valid.article.txt",
-                                     "/run/media/julien/MyPassport/LDC/valid.title.txt",
+    R1SCORE, LSCORE = C2C.validation("/home/ubuntu/LDC/valid.article.txt",
+                                     "/home/ubuntu/LDC/valid.title.txt",
                                      MAX_LENGTH,
                                      BATCH_SIZE)
     print("Validation Score : R1:%f, Loss:%f"%(R1SCORE, LSCORE))
     NEXTR1 = R1SCORE
 
-C2C.evaluation("/run/media/julien/MyPassport/LDC/test.article.txt",
-               "/run/media/julien/MyPassport/LDC/test.title.txt",
+C2C.evaluation("/home/ubuntu/LDC/test.article.txt",
+               "/home/ubuntu/LDC/test.title.txt",
                MAX_LENGTH,
                BATCH_SIZE)
