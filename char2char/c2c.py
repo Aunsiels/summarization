@@ -9,15 +9,15 @@ from pythonrouge import pythonrouge
 
 VOCABULARY_SIZE = 256
 EMBEDDING_SIZE_INPUT = 128
-EMBEDDING_SIZE_OUTPUT = 128 #512
-BATCH_SIZE = 5 # 64
-MAX_LENGTH = 200 # 640 #2048 # MULTIPLE OF STRIDE_POOLING !
-FILTER_SIZES = [20, 25, 30, 30] #[200, 250, 300, 300] #
+EMBEDDING_SIZE_OUTPUT = 512 #128 #512
+BATCH_SIZE = 64 #5 # 64
+MAX_LENGTH = 640 #200 # 640 #2048 # MULTIPLE OF STRIDE_POOLING !
+FILTER_SIZES = [200, 250, 300, 300] #[20, 25, 30, 30] #
 STRIDE_POOLING = 5
 NUM_FILTERS = 2
 HIGHWAY_LAYERS = 4
-HIDDEN_SIZE_INPUT = 128#512
-HIDDEN_SIZE_OUTPUT = 128#1024
+HIDDEN_SIZE_INPUT = 512 #128#512
+HIDDEN_SIZE_OUTPUT = 1024 #128#1024
 
 ROUGE_BASE = "/home/julien/Documents/programming/python/pythonrouge/pythonrouge/RELEASE-1.5.5/"
 ROUGE_SCRIPT = ROUGE_BASE + "ROUGE-1.5.5.pl"
@@ -244,7 +244,7 @@ class Char2Char(object):
         self.summary_writer = tf.train.SummaryWriter('/tmp', graph=self.sess.graph)
 
         self.saver = tf.train.Saver()
-        self.load_model("model_test")
+        #self.load_model("model_test")
 
         print("Graph Built")
 
@@ -337,11 +337,11 @@ class Char2Char(object):
         rouge_l = []
         loss_total = []
         while batch is not None:
-            result, _, loss_value = self.sess.run([self.output_decoder_softmax,
-                                                   self.optimizer,
-                                                   self.loss],
-                                                  feed_dict=batch)
-            if step % 10 == 0:
+            if step % 1000 == 0:
+                result, _, loss_value = self.sess.run([self.output_decoder_softmax,
+                                                       self.optimizer,
+                                                       self.loss],
+                                                      feed_dict=batch)
                 print('Step %d: loss = %.8f' % (step, loss_value))
                 print(result[0].shape)
                 print("".join([chr(x) for x in batch[self.input_sentence][0]]))
@@ -370,7 +370,11 @@ class Char2Char(object):
                 rouge_l.append(str(rouge_l_temp))
                 rouge_su4.append(str(rouge_su4_temp))
                 loss_total.append(str(loss_temp))
-            if step%1000 == 0:
+            else:
+                _, loss_value = self.sess.run([self.optimizer,
+                                               self.loss],
+                                              feed_dict=batch)
+            if step%100000 == 0:
                 self.save_model("model_test")
                 f_register = open("loss.csv", "a")
                 f_register.write(",".join(rouge_1))
@@ -430,13 +434,84 @@ class Char2Char(object):
         f_output.close()
         return sum_score / count_size, sum_loss / count_size
 
+    def evaluation(self, name_article, name_title, max_length, batch_size):
+        """evaluation
+
+        :param name_article: The name of the file containing the text of
+        the article
+        :param name_title: The name of the file containing the titles of
+        the article
+        :param max_length: The maximum length of a sentence
+        :param batch_size: The size of a batch
+        """
+        f_input = open(name_article)
+        f_output = open(name_title)
+        batch = self.generate_batch(f_input, f_output, max_length, batch_size)
+        count_size = 0
+        sum_loss = 0
+        score_r1 = 0
+        score_r2 = 0
+        score_r3 = 0
+        score_l = 0
+        score_su4 = 0
+
+    #'ROUGE-3', 'ROUGE-L', 'ROUGE-1', 'ROUGE-SU4', 'ROUGE-2'
+        while batch is not None:
+            result, loss_value = self.sess.run([self.output_decoder_softmax,
+                                                self.loss],
+                                               feed_dict=batch)
+            for i in range(batch_size):
+                count_size += 1
+                score = get_rouge_score("".join([chr(np.argmax(result[j][i]))
+                                                 for j in range(max_length)]),
+                                        "".join([chr(x)
+                                                 for x in
+                                                 batch[self.output_sentence][i]]))
+                score_r1 += score["ROUGE-1"]
+                score_r2 += score["ROUGE-2"]
+                score_r3 += score["ROUGE-3"]
+                score_l += score["ROUGE-L"]
+                score_su4 += score["ROUGE-SU4"]
+                sum_loss += loss_value
+            batch = self.generate_batch(f_input, f_output, max_length, batch_size)
+        f_input.close()
+        f_output.close()
+        score_r1 /= count_size
+        score_r2 /= count_size
+        score_r3 /= count_size
+        score_l /= count_size
+        score_su4 /= count_size
+        sum_loss /= count_size
+        print("EVALUATION SCORE : ")
+        print("ROUGE 1 : %f"%score_r1)
+        print("ROUGE 2 : %f"%score_r2)
+        print("ROUGE 3 : %f"%score_r3)
+        print("ROUGE L : %f"%score_l)
+        print("ROUGE SU4 : %f"%score_su4)
+        print("LOSS : %f"%sum_loss)
 
 C2C = Char2Char(VOCABULARY_SIZE, EMBEDDING_SIZE_INPUT,
                 MAX_LENGTH, FILTER_SIZES, NUM_FILTERS, STRIDE_POOLING,
                 HIGHWAY_LAYERS, EMBEDDING_SIZE_OUTPUT, HIDDEN_SIZE_INPUT,
                 HIDDEN_SIZE_OUTPUT)
-#C2C.test_train(10000)
-C2C.train_epoch("/run/media/julien/MyPassport/LDC/train.article.txt",
-                "/run/media/julien/MyPassport/LDC/train.title.txt",
-                MAX_LENGTH,
-                BATCH_SIZE)
+
+BESTR1 = 0.0
+NEXTR1 = 0.0
+
+while NEXTR1 >= BESTR1:
+    BESTR1 = NEXTR1
+    C2C.train_epoch("/run/media/julien/MyPassport/LDC/train.article.txt",
+                    "/run/media/julien/MyPassport/LDC/train.title.txt",
+                    MAX_LENGTH,
+                    BATCH_SIZE)
+    R1SCORE, LSCORE = C2C.validation("/run/media/julien/MyPassport/LDC/valid.article.txt",
+                                     "/run/media/julien/MyPassport/LDC/valid.title.txt",
+                                     MAX_LENGTH,
+                                     BATCH_SIZE)
+    print("Validation Score : R1:%f, Loss:%f"%(R1SCORE, LSCORE))
+    NEXTR1 = R1SCORE
+
+C2C.evaluation("/run/media/julien/MyPassport/LDC/test.article.txt",
+               "/run/media/julien/MyPassport/LDC/test.title.txt",
+               MAX_LENGTH,
+               BATCH_SIZE)
