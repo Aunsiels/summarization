@@ -10,14 +10,14 @@ VOCABULARY_SIZE = 256
 EMBEDDING_SIZE_INPUT = 128
 EMBEDDING_SIZE_OUTPUT = 512  #512 #128 #512
 BATCH_SIZE = 64 #5 # 64
-MAX_LENGTH_INPUT = 640 #200 # 640 #2048 # MULTIPLE OF STRIDE_POOLING !
+MAX_LENGTH_INPUT = 600 #200 # 640 #2048 # MULTIPLE OF STRIDE_POOLING !
 MAX_LENGTH_OUTPUT = 200
 FILTER_SIZES = [200, 250, 300, 300] #[20, 25, 30, 30] #
 STRIDE_POOLING = 5
 NUM_FILTERS = 2
 HIGHWAY_LAYERS = 4
-HIDDEN_SIZE_INPUT = 512 #512 #128#512
-HIDDEN_SIZE_OUTPUT = 1024#1024 #128#1024
+HIDDEN_SIZE_INPUT = 256 #512 #128#512
+HIDDEN_SIZE_OUTPUT = 512  #1024 #128#1024
 
 ROUGE_BASE = "/home/ubuntu/pythonrouge/pythonrouge/RELEASE-1.5.5/"
 ROUGE_SCRIPT = ROUGE_BASE + "ROUGE-1.5.5.pl"
@@ -245,7 +245,7 @@ class Char2Char(object):
         self.summary_writer = tf.train.SummaryWriter('/tmp', graph=self.sess.graph)
 
         self.saver = tf.train.Saver()
-        #self.load_model("model_test")
+        self.load_model("model_test")
 
         print("Graph Built")
 
@@ -278,7 +278,7 @@ class Char2Char(object):
         res_output = []
         for _ in range(batch_size):
             temp_input = get_sentence(f_open_input, max_length_input)
-            if temp_input[0] == 0:
+            if temp_input[2] == 0:
                 return None
             res_input.append(temp_input)
             res_output.append(get_sentence(f_open_output, max_length_output))
@@ -306,7 +306,7 @@ class Char2Char(object):
         rouge_l = []
         loss_total = []
         while batch is not None:
-            if step % 10 == 0:
+            if step % 100 == 0:
                 result, _, loss_value = self.sess.run([self.output_decoder_softmax,
                                                        self.optimizer,
                                                        self.loss],
@@ -403,6 +403,7 @@ class Char2Char(object):
         :param max_length: The maximum length of a sentence
         :param batch_size: The size of a batch
         """
+        print("Begin validation")
         f_input = open(name_article)
         f_output = open(name_title)
         batch = self.generate_batch(f_input, f_output, max_length_input,
@@ -411,6 +412,10 @@ class Char2Char(object):
         sum_score = 0
         sum_loss = 0
         while batch is not None:
+            if count_size%1 == 0:
+                print(count_size)
+                print(sum_score / (count_size + 1))
+                print(sum_loss / (count_size + 1))
             result, loss_value = self.sess.run([self.output_decoder_softmax,
                                                 self.loss],
                                                feed_dict=batch)
@@ -424,6 +429,8 @@ class Char2Char(object):
                 sum_loss += loss_value
             batch = self.generate_batch(f_input, f_output, max_length_input,
                                         max_length_output, batch_size)
+            if count_size > 1000:
+                break
         f_input.close()
         f_output.close()
         return sum_score / count_size, sum_loss / count_size
@@ -495,6 +502,14 @@ C2C = Char2Char(VOCABULARY_SIZE, EMBEDDING_SIZE_INPUT,
 
 BESTR1 = 0.0
 NEXTR1 = 0.0
+
+R1SCORE, LSCORE = C2C.validation("/home/ubuntu/LDC/valid.article.txt",
+			     "/home/ubuntu/LDC/valid.title.txt",
+			     MAX_LENGTH_INPUT,
+			     MAX_LENGTH_OUTPUT,
+			     BATCH_SIZE)
+print("Validation Score : R1:%f, Loss:%f"%(R1SCORE, LSCORE))
+NEXTR1 = R1SCORE
 
 while NEXTR1 >= BESTR1:
     BESTR1 = NEXTR1
