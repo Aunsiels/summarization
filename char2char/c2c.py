@@ -62,6 +62,9 @@ class Char2Char(object):
                  n_highway_layers, embedding_size_output, hidden_size_input,
                  hidden_size_output):
 
+        self.vocabulary_size = vocabulary_size
+        self.max_length_input = max_length_input
+
         # INPUT and OUTPUT
         self.input_sentence = tf.placeholder(tf.int32, shape=[None, max_length_input], name="INPUT")
         self.output_sentence = tf.placeholder(tf.int32,
@@ -284,6 +287,59 @@ class Char2Char(object):
             res_output.append(get_sentence(f_open_output, max_length_output))
         return {self.input_sentence : res_input, self.output_sentence : res_output}
 
+    def generate_beam_batch(self, input_sentence, nodes, max_length_output,
+                            batch_size):
+        """generate_beam_batch
+
+        :param input_sentence:
+        :param nodes:
+        """
+        res_input = []
+        res_output = []
+        for i in range(batch_size):
+            res_input.append(input_sentence)
+            if i < len(nodes):
+                res_output.append(nodes[i].get_previous())
+            else:
+                res_output.append([0] * max_length_output)
+        return {self.input_sentence : res_input, self.output_sentence : res_output}
+
+    def beam_search(self, input_sentence, max_length_output, batch_size):
+        """beam_search
+
+        :param input_sentence:
+        :param max_length_output:
+        :param batch_size:
+        """
+        nodes = [get_initial_node()]
+        # Initialization of the beam search
+        batch = self.generate_beam_batch(input_sentence, nodes, max_length_output,
+                                         batch_size)
+        position = 1
+        result = self.sess.run([self.output_decoder_softmax],
+                               feed_dict=batch)
+        nodes_temp = []
+        p_0 = result[position][0]
+        for j in range(self.vocabulary_size):
+            nodes_temp.append(nodes[0].add_next_node(j, p_0[j]))
+
+        nodes = get_beam(nodes_temp)
+        position += 1
+
+        while position < max_length_output:
+            batch = self.generate_beam_batch(input_sentence, nodes, max_length_output,
+                                             batch_size)
+            result = self.sess.run([self.output_decoder_softmax],
+                                   feed_dict=batch)
+            nodes_temp = []
+            for i in batch_size:
+                p_i = result[position][i]
+                for j in range(self.vocabulary_size):
+                    nodes_temp.append(nodes[i].add_next_node(j, p_i[j]))
+            nodes = get_beam(nodes_temp)
+            position += 1
+
+        return get_best_node(nodes)
 
     def train_epoch(self, name_article, name_title, max_length_input,
                     max_length_output, batch_size):
@@ -435,6 +491,55 @@ class Char2Char(object):
         f_output.close()
         return sum_score / count_size, sum_loss / count_size
 
+    def validation_beam(self, name_article, name_title, max_length_input,
+                        max_length_output, batch_size):
+        """validation_beam
+
+        :param name_article: The name of the file containing the text of
+        the article
+        :param name_title: The name of the file containing the titles of
+        the article
+        :param max_length: The maximum length of a sentence
+        :param batch_size: The size of a batch
+        """
+        print("Begin validation beam")
+        f_input = open(name_article)
+        f_output = open(name_title)
+        count_size = 0
+        sum_score1 = 0
+        sum_score2 = 0
+        sum_score3 = 0
+        sum_scorel = 0
+        sum_scores = 0
+        while count_size < 500:
+            temp_input = get_sentence(f_input, max_length_input)
+            in_sentence = "".join([chr(x) for x in temp_input])
+            temp_output = get_sentence(f_output, max_length_output)
+            out_sentence = "".join([chr(x) for x in temp_output])
+
+            beam_result = self.beam_search(temp_input, max_length_output,
+                                           batch_size).get_string()
+
+            count_size += 1
+            rouge_score = get_rouge_score(beam_result,
+                                          out_sentence)
+            sum_score1 += rouge_score['ROUGE-1']
+            sum_score2 += rouge_score['ROUGE-2']
+            sum_score3 += rouge_score['ROUGE-3']
+            sum_scorel += rouge_score['ROUGE-L']
+            sum_scores += rouge_score['ROUGE-SU4']
+            print(count_size)
+            print(in_sentence)
+            print(out_sentence)
+            print(beam_result)
+            print()
+
+        f_input.close()
+        f_output.close()
+        return (sum_score1 / count_size, sum_score2 / count_size,
+                sum_score3 / count_size, sum_scorel / count_size,
+                sum_scores / count_size)
+
     def evaluation(self, name_article, name_title, max_length_input,
                    max_length_output, batch_size):
         """evaluation
@@ -503,11 +608,16 @@ C2C = Char2Char(VOCABULARY_SIZE, EMBEDDING_SIZE_INPUT,
 BESTR1 = 0.0
 NEXTR1 = 0.0
 
+print(C2C.validation_beam("/home/ubuntu/LDC/valid.article.txt",
+                          "/home/ubuntu/LDC/valid.title.txt",
+                          MAX_LENGTH_INPUT,
+                          MAX_LENGTH_OUTPUT,
+                          BATCH_SIZE))
 R1SCORE, LSCORE = C2C.validation("/home/ubuntu/LDC/valid.article.txt",
-			     "/home/ubuntu/LDC/valid.title.txt",
-			     MAX_LENGTH_INPUT,
-			     MAX_LENGTH_OUTPUT,
-			     BATCH_SIZE)
+			                              "/home/ubuntu/LDC/valid.title.txt",
+			                              MAX_LENGTH_INPUT,
+			                              MAX_LENGTH_OUTPUT,
+			                              BATCH_SIZE)
 print("Validation Score : R1:%f, Loss:%f"%(R1SCORE, LSCORE))
 NEXTR1 = R1SCORE
 
@@ -532,3 +642,67 @@ C2C.evaluation("/home/ubuntu/LDC/test.article.txt",
                MAX_LENGTH_INPUT,
                MAX_LENGTH_OUTPUT,
                BATCH_SIZE)
+
+class Node(object):
+    """Node"""
+
+    def __init__(self, previous, score):
+        """__init__
+
+        :param previous:
+        :param score:
+        """
+        self.previous = previous
+        self.score = score
+
+    def get_string(self):
+        """get_string"""
+        return " ".join([chr(x) for x in self.previous])
+
+    def get_previous(self):
+        """get_previous"""
+        result = []
+        for i in range(MAX_LENGTH_OUTPUT):
+            if i < len(self.previous):
+                result.append(self.previous[i])
+            else:
+                result.append(0)
+
+    def is_finished(self):
+        """is_finished"""
+        return len(self.previous) == MAX_LENGTH_OUTPUT
+
+    def add_next_node(self, node, proba):
+        """add_next_node
+
+        :param node:
+        :param proba:
+        """
+        next_previous = self.previous.copy()
+        next_previous.append(node)
+        return Node(next_previous, self.score * proba)
+
+def get_sorted_nodes(nodes):
+    """get_sorted_nodes
+
+    :param nodes:
+    """
+    return sorted(nodes, key=lambda x: x.score)
+
+def get_beam(nodes):
+    """get_beam
+
+    :param nodes:
+    """
+    return get_sorted_nodes(nodes)[0:BATCH_SIZE]
+
+def get_initial_node():
+    """get_initial_node"""
+    return Node([ord('<')], 1.0)
+
+def get_best_node(nodes):
+    """get_best_node
+
+    :param nodes:
+    """
+    return max(nodes, key=lambda x: x.score)
