@@ -8,7 +8,7 @@ rougel = []
 rouges = []
 loss = []
 i = 0
-N = 10
+N = 1000
 BATCHSIZE = 64
 
 for j in f:

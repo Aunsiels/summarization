@@ -687,7 +687,7 @@ def get_sorted_nodes(nodes):
 
     :param nodes:
     """
-    return sorted(nodes, key=lambda x: x.score)
+    return sorted(nodes, key=lambda x: -1 * x.score)
 
 def get_beam(nodes):
     """get_beam
