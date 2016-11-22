@@ -49,6 +49,72 @@ def get_sentence(f_open, max_length):
     line = [ord('<')] + line + [ord('>')] + [0] * (max_length - len(line) - 2)
     return line
 
+
+class Node(object):
+    """Node"""
+
+    def __init__(self, previous, score):
+        """__init__
+
+        :param previous:
+        :param score:
+        """
+        self.previous = previous
+        self.score = score
+
+    def get_string(self):
+        """get_string"""
+        return "".join([chr(x) for x in self.previous])
+
+    def get_previous(self):
+        """get_previous"""
+        result = []
+        for i in range(MAX_LENGTH_OUTPUT):
+            if i < len(self.previous):
+                result.append(self.previous[i])
+            else:
+                result.append(0)
+        return result
+
+    def is_finished(self):
+        """is_finished"""
+        return len(self.previous) == MAX_LENGTH_OUTPUT
+
+    def add_next_node(self, node, proba):
+        """add_next_node
+
+        :param node:
+        :param proba:
+        """
+        next_previous = self.previous.copy()
+        next_previous.append(node)
+        return Node(next_previous, self.score * proba)
+
+def get_sorted_nodes(nodes):
+    """get_sorted_nodes
+
+    :param nodes:
+    """
+    return sorted(nodes, key=lambda x: -1 * x.score)
+
+def get_beam(nodes):
+    """get_beam
+
+    :param nodes:
+    """
+    return get_sorted_nodes(nodes)[0:BATCH_SIZE]
+
+def get_initial_node():
+    """get_initial_node"""
+    return Node([ord('<')], 1.0)
+
+def get_best_node(nodes):
+    """get_best_node
+
+    :param nodes:
+    """
+    return max(nodes, key=lambda x: x.score)
+
 #pylint: disable=too-many-instance-attributes
 class Char2Char(object):
     """Char2Char"""
@@ -319,7 +385,7 @@ class Char2Char(object):
         result = self.sess.run([self.output_decoder_softmax],
                                feed_dict=batch)
         nodes_temp = []
-        p_0 = result[position][0]
+        p_0 = result[0][position][0]
         for j in range(self.vocabulary_size):
             nodes_temp.append(nodes[0].add_next_node(j, p_0[j]))
 
@@ -332,8 +398,8 @@ class Char2Char(object):
             result = self.sess.run([self.output_decoder_softmax],
                                    feed_dict=batch)
             nodes_temp = []
-            for i in batch_size:
-                p_i = result[position][i]
+            for i in range(batch_size):
+                p_i = result[0][position][i]
                 for j in range(self.vocabulary_size):
                     nodes_temp.append(nodes[i].add_next_node(j, p_i[j]))
             nodes = get_beam(nodes_temp)
@@ -511,7 +577,7 @@ class Char2Char(object):
         sum_score3 = 0
         sum_scorel = 0
         sum_scores = 0
-        while count_size < 500:
+        while count_size < 100:
             temp_input = get_sentence(f_input, max_length_input)
             in_sentence = "".join([chr(x) for x in temp_input])
             temp_output = get_sentence(f_output, max_length_output)
@@ -608,11 +674,11 @@ C2C = Char2Char(VOCABULARY_SIZE, EMBEDDING_SIZE_INPUT,
 BESTR1 = 0.0
 NEXTR1 = 0.0
 
-print(C2C.validation_beam("/home/ubuntu/LDC/valid.article.txt",
-                          "/home/ubuntu/LDC/valid.title.txt",
-                          MAX_LENGTH_INPUT,
-                          MAX_LENGTH_OUTPUT,
-                          BATCH_SIZE))
+#print(C2C.validation_beam("/home/ubuntu/LDC/valid.article.txt",
+#                          "/home/ubuntu/LDC/valid.title.txt",
+#                          MAX_LENGTH_INPUT,
+#                          MAX_LENGTH_OUTPUT,
+#                          BATCH_SIZE))
 R1SCORE, LSCORE = C2C.validation("/home/ubuntu/LDC/valid.article.txt",
 			                              "/home/ubuntu/LDC/valid.title.txt",
 			                              MAX_LENGTH_INPUT,
@@ -642,67 +708,3 @@ C2C.evaluation("/home/ubuntu/LDC/test.article.txt",
                MAX_LENGTH_INPUT,
                MAX_LENGTH_OUTPUT,
                BATCH_SIZE)
-
-class Node(object):
-    """Node"""
-
-    def __init__(self, previous, score):
-        """__init__
-
-        :param previous:
-        :param score:
-        """
-        self.previous = previous
-        self.score = score
-
-    def get_string(self):
-        """get_string"""
-        return " ".join([chr(x) for x in self.previous])
-
-    def get_previous(self):
-        """get_previous"""
-        result = []
-        for i in range(MAX_LENGTH_OUTPUT):
-            if i < len(self.previous):
-                result.append(self.previous[i])
-            else:
-                result.append(0)
-
-    def is_finished(self):
-        """is_finished"""
-        return len(self.previous) == MAX_LENGTH_OUTPUT
-
-    def add_next_node(self, node, proba):
-        """add_next_node
-
-        :param node:
-        :param proba:
-        """
-        next_previous = self.previous.copy()
-        next_previous.append(node)
-        return Node(next_previous, self.score * proba)
-
-def get_sorted_nodes(nodes):
-    """get_sorted_nodes
-
-    :param nodes:
-    """
-    return sorted(nodes, key=lambda x: -1 * x.score)
-
-def get_beam(nodes):
-    """get_beam
-
-    :param nodes:
-    """
-    return get_sorted_nodes(nodes)[0:BATCH_SIZE]
-
-def get_initial_node():
-    """get_initial_node"""
-    return Node([ord('<')], 1.0)
-
-def get_best_node(nodes):
-    """get_best_node
-
-    :param nodes:
-    """
-    return max(nodes, key=lambda x: x.score)
