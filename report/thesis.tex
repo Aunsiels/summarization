@@ -1,0 +1,486 @@
+\documentclass[11pt,a4paper,oldfontcommands]{memoir}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{microtype}
+\usepackage[dvips]{graphicx}
+\usepackage{xcolor}
+\usepackage{times}
+\usepackage{amsmath}
+
+\usepackage[
+breaklinks=true,colorlinks=true,
+%linkcolor=blue,urlcolor=blue,citecolor=blue,% PDF VIEW
+linkcolor=black,urlcolor=black,citecolor=black,% PRINT
+bookmarks=true,bookmarksopenlevel=2]{hyperref}
+
+\usepackage{geometry}
+% PDF VIEW
+% \geometry{total={210mm,297mm},
+% left=25mm,right=25mm,%
+% bindingoffset=0mm, top=25mm,bottom=25mm}
+% PRINT
+\geometry{total={210mm,297mm},
+left=20mm,right=20mm,
+bindingoffset=10mm, top=25mm,bottom=25mm}
+
+\OnehalfSpacing
+%\linespread{1.3}
+
+%%% CHAPTER'S STYLE
+\chapterstyle{bianchi}
+%\chapterstyle{ger}
+%\chapterstyle{madsen}
+%\chapterstyle{ell}
+%%% STYLE OF SECTIONS, SUBSECTIONS, AND SUBSUBSECTIONS
+\setsecheadstyle{\Large\bfseries\sffamily\raggedright}
+\setsubsecheadstyle{\large\bfseries\sffamily\raggedright}
+\setsubsubsecheadstyle{\bfseries\sffamily\raggedright}
+
+
+%%% STYLE OF PAGES NUMBERING
+%\pagestyle{companion}\nouppercaseheads 
+%\pagestyle{headings}
+%\pagestyle{Ruled}
+\pagestyle{plain}
+\makepagestyle{plain}
+\makeevenfoot{plain}{\thepage}{}{}
+\makeoddfoot{plain}{}{}{\thepage}
+\makeevenhead{plain}{}{}{}
+\makeoddhead{plain}{}{}{}
+
+
+\maxsecnumdepth{subsection} % chapters, sections, and subsections are numbered
+\maxtocdepth{subsection} % chapters, sections, and subsections are in the Table of Contents
+
+
+%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%
+
+\begin{document}
+
+%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%
+%   TITLEPAGE
+%
+%   due to variety of titlepage schemes it is probably better to make titlepage manually
+%
+%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%
+\thispagestyle{empty}
+
+{%%%
+\sffamily
+\centering
+\Large
+
+~\vspace{\fill}
+
+{\huge 
+Abstractive Text Summarisation with Neural Networks
+}
+
+\vspace{2.5cm}
+
+{\LARGE
+Julien Romero
+}
+
+\vspace{3.5cm}
+
+Master Thesis\\[1em]
+in the\\[1em]
+Data Analytics Lab\\
+ETH Zürich
+
+\vspace{3.5cm}
+
+Supervisor: Prof. Thomas Hofmann
+
+\vspace{\fill}
+
+January 2017
+
+%%%
+}%%%
+
+\cleardoublepage
+%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%
+%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%
+
+\tableofcontents*
+
+\clearpage
+
+%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%
+%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%---%%%
+
+\chapter{Introduction}
+
+\section{Why Summarization?}
+
+The growing of the web creates a lot of contents. These contents may come from a lot of different sources: newspaper, blogs, videos,... and they cover a large amount of topics. In addition, everything is connected, making the web a  jungle in which a guide is needed.
+In this overloaded space of information, finding quickly what one is looking for can be a hard task. Search engines such as Google, Bing or Yahoo! make the search for a relevant page easier. However, this page might be already full of useless information that slow down the reader. Actually, the creator of the content might discuss different topics what are not relevant with the original search or he simply makes his content more artistic, making the final result longer to consult. So, having a shorter version of a content makes the reading faster. This is what is called summarization: creating a new piece of information that covers the main points succinctly.
+
+\section{A Difficult and General Task}
+
+Producing a summary can be a hard task for a human. For instance, the hardest exams for engineer schools in France ask students to write summaries for difficult texts. The reason is simple: a good summary proves that the content was understood. As Chaitin said: "compression is comprehension". In fact, summarization can be seen as a compression problem. The source is being reduced by trying to keep the most relevant information.
+
+This need of summarizing appears also in modern science and is one of the main point of process. Reducing the laws of a theory to a few ones makes inconsistencies easier to see and the evaluation of how complete the theory is simpler. Therefore, it improves the understanding of the entire theory. So, mathematicians write axioms and physicists are trying to find the equation that explain the entire universe.
+
+If summarization is a challenge for human, it is also a huge challenge for machines. In fact, as we discuss above, a good summary proves that the content was understood. So, we are exploring the heart of artificial intelligence by creating machine which are able to understand the same way human do.
+In the following work, the focus will be set on automatic text summarization. However, other kinds of automated summarizations exist, such as video and audio summarization.
+
+\section{Abstract}
+
+Text summarisation in NLP has largely been limited to extractive methods that crop out and stitch together portions of the original text in order to capture the bulk of the meaning concisely. What's been much less attempted and poorly understood, is abstractive methods that might produce words not in the original text, giving more natural summaries and dynamic paraphrases. We employ a fully data-driven approach using a recurrent neural network: given a text and summary pair, we train the model end-to-end to predict the summary given the original text. Inspired by the recent success of Neural Machine Translation, this project will explore different architectural choices to encode the original text efficiently into a vector representation on which the decoder language model is conditioned.
+
+\section{Organization of the Thesis}
+
+TODO : Explain the frame of the thesis
+
+\chapter{Prerequisites}
+
+\section{Automatic Text Summarization}
+
+We call automatic text summarization the task of generating thanks to a computer a shorter version of a given document. The main goals are to first extract the most meaningful information and then write it using a human language.
+
+There are different ways to classify a summarization algorithm..
+
+First, the summarization can be done on a single document or on multiple documents. The problems are different. With multi-documents summarization, more redundancy appears and the chronological order is not obvious, especially if documents cover the same time span. In this work, we will focus on single document summarization. So, we have less redundancy and time problems are less important.
+
+Secondly, a summary can be written in a general way, which is called generic summarization, or can be oriented by the user, which is called query focused summarization. The main difference is that if the reader is looking for a specific topic in a text, the algorithm can adapt in the case of query focused summarization. In this work, we will deal with generic summarization.
+
+Thirdly, the summarization can be either in an abstractive or an extractive way. With an extractive summarizer, sentences are taken from the source text. This way, it is easier to have meaningful human language in the summary. However, sometimes sentences may seem unrelated, not organized in a natural way or may contain useless information. In abstractive summarization, new sentences are generated. This way, one hope that the summary will look more natural and that only relevant information is kept. However, the task is harder. Both abstractive and extractive summarization will be consider in this work.
+
+Other kind of summarization tasks exist. For instance, one can try to perform multilingual summarization, which means that multiple documents are given but they are not necessary written in the same language. One can also write domain specific summarization. Depending on the domain, some information may be more relevant and so a specific algorithm can perform better than a general one. An other kind of summarization is the update summarization: given some knowledge the user has, the machine needs to write a summary which completes and update what the user knows. More recent work try to perform tweet stream summarization. This is a very special type because because there are multiple very short document that need to be merged and compress.
+
+\section{Summarization Main Problems}
+\label{Summarization Main Problems}
+
+There are three main problems that need to be tackled to write a good summary.
+First, content need to be selected. A text contains a lot of information. Some are redundant, some are less important than other and some are of no interest for the reader. So, a method to select relevant contents from the ones which are not is required. Basically, this is a classification task.
+
+Then, once the components of the summary are chosen, the information has to be ordered. In fact, if the information is not ordered correctly, it may change the meaning of the original text. So one need to be careful with it. For single document summarization, one may assume that the order of sentences implies the order of the information but for multi-document summarization, the problem is not trivial.
+
+Finally, sentences need to be generated. This step is important to make the sentences easier to read for human. The final result have to look fluent. It is also important to express correctly the original content. Another aspect of this stage is to compress sentences: the information need to be express the most efficiently possible.
+
+\section{Abstractive Summarization}
+
+Abstractive summarization is the natural way human write summaries. However, the problem need to be expressed in a more mathematical way to be understood by machine. One can see it as an optimization problem. Given a score function $s$ which evaluates how good a solution is, the perfect summary can be expressed by
+
+\[argmax_{y in Y} s(x, y)\]
+
+Where $x$ is the input text and $Y$ is the set of all possible summaries. If we limit the problem to summaries of size $N$ and if we have a vocabulary $V$ of size $|V|$, $Y = |V|^N$. Obviously, this problem become very quickly intractable and approximations need to be found.
+
+\section{Extractive Summarization}
+
+Extractive summarization can be expressed in a more formal way. As we already mentioned, extractive summarization means that pieces of the original text are copied to generate a summary. So, a first definition might be:
+
+\[argmax_{y in S} s(x, y)\]
+
+where x is the input text and S is the set of all possible sentences combinations. This set can be reduced if we consider that is order is conserved. If the original text is composed of $M$ sentences and if we associate for each sentence a indicative function which tells us whether the sentence is selected for the summary or not. Then, the problem become:
+
+\[argmax_{y in {0,1}^M} s(x, y)\]
+
+
+The same definitions are also valid if instead of picking sentences, words are picked.
+
+\section{Evaluate Summaries}
+
+When we defined abstractive and extractive summarization, we used a score function. However, we did not defined what it is. In fact, it is quite hard to defined it. On way to defined it is, given a model $\theta$, by using the log probability.
+
+\[s(x, y) = log p(y|x; \theta) \approx \sum log(p(y_{i+1} | x, y_{[0:i]}, \theta))\]
+
+where $y_[0:i]$ are all previous outputs before output $i$. What was done before was to separate the probability into two parts by using Bayes rule:
+
+\[argmax(log(p(y|x))) = argmax(log(p(y)p(x|y)))\]
+
+where $p(y)$ is the language model and $p(x|y)$ is the summarization model. In this work, we will approximate $p(y|x)$ directly with our neural network.
+
+However, the way summaries are evaluated in the general case is not clear. Here we can use the measurement which are used in machine translation: BLEU and ROUGE scores.
+
+BLEU (BiLingual Evaluation Understudy) is a precision oriented score. It is defined as follows:
+
+\[BLEU = \frac{\text{number of words in the summary which are in the gold standard}}{\text{Total number of words in the summary}}\]
+
+The recall side of BLEU is called ROUGE for Recall-Oriented Understudy for Gisting Evaluation. There are different versions of Rouge. The direct BLEU equivalent is ROUGE-1 and counts unigram overlaps:
+
+
+\[\text{ROUGE-1} = \frac{\sum_{\text{Reference Summary}} \sum_{unigram} count_{match}(unigram)}{\sum_{\text{Reference Summary}} \sum{unigram} count(unigram)}\]
+
+
+This definition can be generalized to N-grams:
+
+\[\text{ROUGE-N} = \frac{\sum_{\text{Reference Summary}} \sum_{Ngram} count_{match}(Ngram)}{\sum_{\text{Reference Summary}} \sum{Ngram} count(Ngram)}\]
+
+There exists other extensions of Rouge. For instance, ROUGE-L takes into account the longest common sequence and Rouge-S and Rouge-SU consider skip sequences.
+
+Evaluating a summary is still a topic of research and there is no perfect way to do it yet.
+
+\section{Machine Translation and Summarization}
+
+One way to look at summarization is to consider it as a machine translation problem: we want to translate the original text to a shorter version of this text. The idea is to use work done in machine translation, area which is very active and to adapt it to text summarization.
+
+Another criteria which links machine translation and summarization is the use of the same metrics to evaluate to result: ROUGE and BLEU scores.
+
+\section{Datasets}
+
+Some datasets exist to do text summarization. DUC, which later became TAC provided some data for summarization. Unfortunately, we had no access to those data. So, we used other data.
+First, we worked with the Gigaword dataset. This is a dataset for headline generation. It is composed of around 4 millions article (\cite{Graff03} Graff et al., 2003). This dataset is composed of pair of articles and titles. Article are generally a long sentence and titles are shorter versions of the articles. The mean size of article is 182 characters whereas the mean size of a title is 52 characters.
+
+We also explored a more recent dataset: the DailyMail and CNN dataset (\cite{DBLP:journals/corr/HermannKGEKSB15} Hermann et al. 2015). These two corpora associate the articles on the DailyMail website and the CNN website to the bullet points on the same website. These bullet points can be considered as a summary for the article. The mean size of articles is around 4500 characters and the mean size of the summaries is around 380 characters. This is longer than the Gigaword dataset.
+
+Following the example of the DailyMail and CNN dataset, a similar datasets have been created for french and spanish based on 20minutes (see TODO).
+
+\section{Extractive Algorithms}
+
+\subsection{Centroid Algorithm: ARTEX}
+\label{ARTEX}
+
+Artex (AnotheR TEXt summirizer, \cite{DBLP:journals/corr/abs-1210-3312} Torres-Moreno 2012) is an algorithm which operates in the sentences or words vector space. The idea is to represent each sentences by a vector. Then, we have a vector which stands for the general topic of the text. To write the summary we then choose the closest sentences to the general topic.
+
+More formally, we consider a text with $P$ sentences. We give these sentences a vector representation $s_1,...,s_P$. These vectors are defined following the Vector Space Model (VSM): the size of one vector is the size of the vocabulary, we call $N$. Then, the weight for each term in the vector can be defined in different ways. The most simple one is to simply count the number of times a word appear in the sentence. A more sophisticated and popular weight is the tf-idf weight. It is defined as follows: 
+
+\[tf(s_j,w_i)=\text{Number of times }w_i\text{ appears in }s_j\]
+\[idf(w_i, text)=\frac{N_{sentences}}{|\{d \in text: w_i \in d \}|}\]
+\[tdidf(s_j,w_i, text)=tf(s_j,w_i)*idf(w_i, text)\]
+
+Basically, tfidf will give more importance to rare word rather than very frequent words. This follows the intuition that frequent words carry less specific information as they are often used.
+
+Once we have the sentences vectors $s_1,...,s_P$, we can defined the topic vector. For that, we define the average pseudo-word vector as the average number of occurrences of N words used in the sentence i:
+
+\[a_i = \frac{1}{N}\sum_j s_{i,j}\]
+
+The same way, the average pseudo-sentence vector can be computed, and is defined for each word as:
+
+\[b_j = \frac{1}{P} \sum_i s_{i,j} \]
+
+Then, a score can be computed for each sentence:
+
+\[score(s_i)=(s_i \cdot b) \times a_i\]
+
+b here can be seen as the topic vector and so $s_i \cdot b$ represents how close sentence $i$ is to the topic vector. In addition, the score is weighted by $a_i$, which represents how informative a sentence is.
+
+Once all the scores are computed, sentences with top scores are selected to create a summary.
+
+\subsection{PageRank}
+\label{PageRank}
+
+PageRank (\cite{ilprints422} Page et al.) is an algorithm which was originally designed to weight pages on the web and so better organize searches. The idea of the algorithm is based on two observations. The first one is that the more important a page is, the more links will point at it. In fact, if a good content is published people will point at it as a reference. The second observation is that if a page of good quality point to an other page, this page should be of good quality too. Actually, the writer of the first page is supposed to keep a standard of quality.
+
+These two observation can be translate more formally in a formula. Let's consider a directed graph where each node is a page and where an edge indicates a reference to another page. If we call $PR$ the score of a given page, we have:
+
+\[PR(A) = \frac{1 - d}{N} + d * \sum_{\text{B links to A}}\frac{PR(B)}{C(B)}\]
+
+where $L(B)$ is the number of edges which come out of $B$. $d$ is called is the damping factor and has a value between 0 and 1. In general, $d=0.85$. d can be seen as a regularization factor.
+
+PageRank can be computing using techniques such as dynamic programming but becomes a challenge when the number of nodes becomes high.
+
+\subsection{LexRank}
+\label{LexRank}
+
+LexRank (\cite{DBLP:journals/corr/abs-1109-2128}) is an algorithm based on PageRank (see \ref{PageRank}). The difference with the basic PageRank algorithm is that now, instead of having non-weighted edges in the graph, we will weight each edge. The new formulation is then:
+
+\[PR(A) = \frac{1 - d}{N} + d * \sum_{\text{B links to A}}\frac{weight(B, A)}{\sum_{\text{C out of B}}weight(B, C)}PR(B)\]
+
+where $weight(X, Y)$ is the weight of the edge from X to Y.
+
+For LexRank, the nodes of the graph are sentences and the graph is considered to be undirected, which means $weight(X, Y) = weight(Y, X)$. Each sentence is represented by a vector following the Vector Space Model (see \ref{ARTEX}). The size of the vector $s_i$ is the size of the vocabulary and each coefficient $s_i(j)$ is the tfidf score associated with the word $w_j$. Then, we define the weights of the edge between sentence $i$ and $k$ as follows:
+
+\[weight(s_i, s_k)=cosine(s_i, s_j)= \frac{s_i \cdot s_j}{||s_i|| * ||s_j||}\]
+
+Then, the PageRank score is computed for each sentence and the best sentences are picked to create a summary.
+
+\subsection{TextRank}
+\label{TextRank}
+
+TextRank (\cite{DBLP:conf/emnlp/MihalceaT04}) is, as LexRank (\ref{LexRank}) an algorithm based on PageRank. We also use the continuous version of PageRank and the graph is also composed of sentences as nodes. The main difference is in the weight function:
+
+\[weight(s_i, s_j) = \frac{\sum_{w \in s_i and s_j}C_w^i + C_w^j}{log(|s_i|) + log(|s_j|)}\]
+
+where $C_w^k$ is the number of occurrences of word $w$ in sentence $s_k$. We divide by $log(|s_i|) + log(|s_j|)$ to prevent long sentences from being favored.
+
+Then, like LexRank, the PageRank score is computed for each sentence and the best sentences are picked to create a summary.
+
+\section{Preprocessing}
+
+Preprocessing data is important when one want to analyze it. It reduces the noise which comes from information which is known as being irrelevant. So, at the end, a good preprocessing improves the performances of the entire system.
+
+Preprocessing can be decomposed into three steps:
+
+\begin{itemize}
+
+\item Splitting. When received by the algorithm, the whole text is presented as a monolithic block. However, some algorithms (ARTEX \ref{ARTEX} or LexRank \ref{LexRank}) need to get a text decomposed in several sentences. That's the goal of that step.
+\item Tokenize. Once we have sentences, they need to be separated in several words. Then, these words can be simplified to reduce their number. At the end, we obtain something more general than words: tokens.
+\item Annotate. For some algorithm, it could be interesting to annotate each tokens to better catch its meaning, for example when a word has multiple meanings.
+
+\end{itemize}
+
+\subsection{Splitting}
+
+Splitting a given text in several sentences can be done by using punctuation. For instance, ".", "?" or "!" are good indicators of end of sentences. However, some exceptions may break the system. If we consider abbreviations such as Mt. Fuji, the dot does not represents the end of the sentence. We can also consider that the writer do not respect conventions for punctuation (which is quite common on the web, on Twitter for example) and so one need to be careful when cutting a text.
+
+Some systems provide different approaches. The are three main of them:
+
+\begin{itemize}
+
+\item Statistical Inference, implemented in OpenNLP
+\item Regex-based rules implemented in GATE.
+\item Using finite automata, like in Stanford CoreNLP
+
+\end{itemize}
+
+\subsection{Tokenize}
+\label{Tokenize}
+
+Tokenization begins in general by separating words. For occidental languages, using space as a separator is a good choice, even if, like for sentence splitting, writers may not respect conventions.
+
+Once we have all the words, we can try to reduce their number. In fact, if we use the Vector Space Mod for instance, the less words, the faster the algorithm. Here are some ways to remove words:
+
+\begin{itemize}
+
+\item Remove rare characters such as punctuation, "\#" or "\&" or replace all of them by a single token, "<punc>". That way, we characters which are stuck to some words, such as a "." or a "?".
+\item Remove stop words. Stop words are words which occur very often in a language. In example, "a", "the" or "to" can be consider as stop words for english.
+\item Lemmatization. Group together which are derivatives from the same word. For example, "good, better, best" or "go, went, gone, goes" can be reduce to a single token. In general, this task is hard to do.
+\item Stemming. The step consist in reducing a word to his root. For example, "stemming" can be reduce to "stem" and "computer" to "comput". In general, this step is done based on rules, which depend on the language. So, it is easier to do than lemmatization but sometimes, words which have different meaning can be merged.
+\item Remove capitalization. Writing with capital letters give a different token if nothing is done. So, it is possible to write everything with lower cases to reduce the size of the vocabulary.
+
+\end{itemize}
+
+\subsection{Annotate}
+
+This step is not mandatory in general. It depends on the algorithm which is used. Here are some examples of annotations:
+
+\begin{itemize}
+
+\item Part Of Speech (POS) tagging. This allows to group together words this similar grammatical functions, such as verb or noun. This can be useful to separate words with the same spelling but different meaning like "a fly" and "to fly".
+\item Named Entity recognition. Names are special words which have no specific meaning and which are in general rare inside the vocabulary. Knowing where there are may allow an algorithm to treat them differently. Moreover, Named Entity can give additional information about a Name, like if it is person or a company.
+
+\end{itemize}
+
+\section{Use Machine Learning for Extractive Summarization}
+
+If we consider extractive summarization as a classification problem as mention in \ref{Summarization Main Problems}, we could use a machine learning algorithm to classify sentences. To obtain good results, one need to extract good features from the text for each sentence. Here are some features used by Kupiec et al. (\cite{DBLP:conf/sigir/KupiecPC95}) to perform this task:
+
+\begin{itemize}
+
+\item Sentence Length Cutoff Feature. If the length of a sentence is more than a given threshold $u_{threshold}$, the value of this feature is one. Otherwise it is zero. That follows the idea that short sentences should not be included in the summary.
+
+\item Fixed-phrase Feature. For this feature, we check if the intersection of the sentence with a set of good phrases which are known to be indicators of extracted sentences (such as "In conclusion" or "results") is not empty.
+
+\[ s \cap dictionary_{fixed_phrases} \neq \emptyset\]
+
+If it is not empty, the feature's value is 1, otherwise it is 0. The set of fixed phrases is limited to 26 examples.
+
+\item Paragraph Feature. The position in the paragraph can be either begin, middle or end.
+
+\item Thematic Word Feature. The presence and number of thematic terms is checked. Thematic words for a given text are defined as the most frequent content words. For a sentence, we check whether the number of thematic words is more than a given threshold. Thus, this feature can take two values: 0 or 1.
+
+\item Uppercase word Feature. Proper names are consider to be important. The way to locate them is by using upper case detection. This feature counts the number of uppercase characters in the sentence.
+
+\end{itemize}
+
+These features are gathered inside a vector and then a classifier is train on data. However, the label of each sentence may not be available. So, one need to use first an alignment algorithm to give a label to each sentence based on the given algorithm.
+
+\section{Deep Learning}
+
+\subsection{Word Embedding}
+
+Working with words is not easy because they are not easy to manipulate. However, when we want to do some mathematics, numbers are the natural way to express problems. A first idea could be to associate a number to each word. A dictionary is build and each word in this dictionary receives a number. This is what is done in the Vector Space Model (see \ref{ARTEX}). Then each of them represents a dimension in a space where the total dimension is the size of the vocabulary.
+
+Two main problems appear. First, if the vocabulary size is huge (and it is quickly the case), then the vector space has a high dimension and computations become harder and longer. One can think about reducing the vocabulary size through lemmatization or stemming (see \ref{Tokenize}) but the dimentionality remains high. The second problem is that even if we have a number for each word, this number has no semantic meaning and is still hard to manipulate.
+
+To tackle this problem, one can represent each word by a vector of a dimension which is significantly smaller than the size of the vocabulary. These vectors are called word embeddings. A word embedding needs to be learned to carry as much as possible semantic information. One property we wish we have is that words which have close meaning, such as "cat" and "dog" or "green" and "orange", are close in our new vector space.
+
+These vectors can be learn in several ways. The first one is to learn them directly with our model. Thus, the created vectors will contain information which is useful to solve the given problem. However, it makes the entire model longer to learn.
+
+The other approach is to learn the word embeddings independently from a problem, in a unsupervised way. This is what is done with the word2vec algorithm by Mikolov et al. (\cite{DBLP:journals/corr/MikolovSCCD13}) or by the GLOVE algorithm by Pennington et al. (see \cite{DBLP:conf/emnlp/PenningtonSM14}). Once these word embeddings are learned, they can be use to initialize the word embeddings of a model. This way, the training is made faster.
+
+One thing to notice with words embedding is that some structure appear and it is possible to perform basic arithmetic operation. A famous example:
+
+\[ v(king) - v(man) + v(woman) \approx v(queen) \]
+
+This can be interpreted as follow: A king is to a man what a queen is to a woman.
+
+\subsection{Recurrent Neural Networks}
+
+\subsubsection{Simple Recurrent Networks}
+
+\subsubsection{Bidirectional Recurrent Networks}
+
+\subsubsection{GRU}
+
+\subsubsection{LSTM}
+
+\subsection{Seq2seq}
+\label{Seq2seq}
+
+Seq2seq (sequence to sequence) was introduced by Cho et al. \cite{DBLP:journals/corr/ChoMGBSB14}. The idea is to convert an input sequence to an output sequence thanks to recurrent units. For example in our case, we would like to convert the input text, which is a sequence of words or characters, to a summary of the given given text, which is also a sequence of words or characters.
+
+Seq2seq is generally decomposed into two parts. The first one is called the encoder. It takes the input and transforms it into a single vector (it encodes the input). This vector is generated by using a recurrent network with gates such as GRUs or LSTMs. The input is divided into several tokens (words in general) and each token is given as an input to a gate. Then, once we have obtain the vector at the end of the encoder, we give it to the decoder. The decoder is also a recurrent network. Its initial state is the last state of the encoder and its inputs are the previously generated output. In fact, each recurrent unit in the decoder generates an output (whereas the encoder does not). We keep generating an output until the end of sequence output is generated.
+
+More formally, if we call $T_{in}$ the length of the input sequence $x$, we have for the encoder a function $f$ (which represents a gate) such that a hidden state $h_i$ can be computed as follows:
+
+\[ h_i = f(h_{i-1}, x_i)\]
+
+where $h_0$ is set to some fixed value (a zero vector for instance). Then the decoder receives $h_{T_{in}}$ as a first state $s_0$. Then, we have two functions $g$ and $k$ such that:
+
+\[ p(y_i|y_1,...,y_{i-1}, x) =  g(y_{i-1}, s_i)\]
+
+and:
+
+\[ s_i = k(s_{i-1}, y_{i-1})\]
+
+where $y$ is the output sequence.
+
+This Seq2seq model can be adapted to different architectures and attention mechanism can be added to it.
+
+\subsection{Attention Mechanism}
+
+One problem that may appear with seq2seq (\ref{Seq2seq}) is that it might be impossible to summarize efficiently the whole input sentence into on single vector (which is given as an input to the decoder). In particular, long term dependencies might be hard to model. One solution to this problem is called attention.
+
+The idea is simple: instead of building a vector for the sentence, we keep the entire input sentence and we use it at every step of a recurrent network which generates the output. One thing we try to do is, at every time step, to focus on useful information in the input sentence. This is an attention mechanism. It depends on all previous outputs of our recurrent network (which are summarized inside a hidden state).
+
+Attention mechanisms were introduced by Bahdanau, et al. in 2014 \cite{DBLP:journals/corr/BahdanauCB14} for machine translation. They did not use the input sentence directly but state vectors learned from the input sentence. Then, the states are combined via a weighted sum. The weights are computed from previous outputs. This way, only useful information is kept.
+
+More formally, states vectors $h_{1..T_{in}}$, where $T_{in}$ is the length of the input sentence (in general), are built from the input sentence thanks to a bidirectional recurrent network for example. With those state vectors, a context vector $c_t$ is constructed for each time step of the output network using an attention mechanism. It is a weighted combination of the input states.
+
+\[ c_t = \sum_{i=1}^{T_{in}} \alpha_{i,t}h_i\]
+
+Then, this context vector is used in the output recurrent network. If $s_i$ are the states vectors of this recurrent network and $y_i$ the outputs, we have some function $f$ and $g$ such that:
+
+\[ p(y_i|y_1,...,y_{i-1}, x) = g(y_{i-1}, s_i, c_i)\]
+
+and
+
+\[ s_i = f(s_{i-1}, y_{i-1}, c_i)\]
+
+As we mentioned above, the context vector is a weighted sum of the input states which depends on all previous output (through the output state vector $s_i$). So, the $\alpha$s can be computed this way, thanks to a function $a$ which is called the alignment model and which is in general a feedfoward network:
+
+\[ e_{i, t} = a(s_{t-1}, h_i\]
+
+which need to be transform into a probability thank to a softmax function.
+
+\[ \alpha_{i, t} = \frac{exp(e_{i, t})}{\sum_j exp(e_{j, t})}\]
+
+\section{Beam Search}
+
+\section{Previous Works on Abstractive Summarization}
+
+\chapter{Results}
+
+\section{Exploring Extractive Summarization}
+
+\section{Exploring Abstractive Summarization}
+
+\iffalse
+
+\appendix
+
+\chapter{Additional}
+
+\fi
+
+\nocite{*}
+\bibliographystyle{plain}
+\bibliography{sample}
+
+\end{document}
+

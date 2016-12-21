@@ -1,0 +1,8 @@
+report/thesis.toc
+report/thesis.pdf
+*.log
+report/thesis.out
+*.blg
+report/thesis.bbl
+*.gz
+report/thesis.aux
